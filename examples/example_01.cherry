@@ -1,0 +1,10 @@
+; Random video & user "configuration"
+
+@ Video:
+  set   "opengl", driver
+  set   "1920x1080", resolution  
+  set   yes, vsync
+
+@ User:
+  set   "randomUser", name
+  set   "cross", crosshair_style ; idk

@@ -1,0 +1,9 @@
+name "cherry"
+description "cfg"
+authors "Cyrodwd"
+copyright "Copyright © 2025, Cyrodwd"
+license "MIT"
+
+targetName "cherry"
+targetType "staticLibrary"
+mainSourceFile "source/cherry.d"
