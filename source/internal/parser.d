@@ -113,7 +113,7 @@ struct Lexer {
 
   void setup(string s) in(s.length > 0) {
     _sourceContent = s;
-    _currentLine = 0, _currentRow = 0;
+    _currentLine = 1, _currentRow = 1;
     _currentPosition = 0;
 
     _startLine = _startRow = _startPosition = 0;
@@ -141,9 +141,9 @@ private:
   /// Current position in the source content
   size_t          _currentPosition;
   /// The starting line of a token
-  size_t          _startLine = 0;
+  size_t          _startLine = 1;
   /// The starting row / column of a token
-  size_t          _startRow = 0;
+  size_t          _startRow = 1;
   /// The starting position of a token
   size_t          _startPosition = 0;
   /// Current character in the source content
@@ -243,10 +243,12 @@ private:
     import std.conv : to;
     import std.algorithm.iteration : map;
 
+    // Convert it to lowercase (case-insensitive)
     ch_String convId = str.map!(a => toLower(a)).to!string;
     if (convId !in keywords)
       return TokenType.Identifier;
 
+    // Return the token type of the keyword
     return keywords[convId];
   }
 
@@ -254,7 +256,7 @@ private:
   /* Tokenizer */
   // ========= //
   
-  // Very autodescriptive
+  // Very autoexplicative
 
   void skipComment()
   {
@@ -298,9 +300,9 @@ private:
 
     // Integers-only for now
     while ( ( isDigit ( _currentChar ) || isCurrEq('.') ) && !isCurrEq(ch: 0) ) {
-      // Do not start with zero
-      if (_startPosition == _currentPosition && (isCurrEq(ch: '0') && peek() != '.')) {
-        throw new Exception(error("parseNumber", "An integer number cannot start with zero")); }
+      // Do not start with zero if  there are more digits before it
+      if (_startPosition == _currentPosition && (isCurrEq(ch: '0') && isDigit(peek()) )) {
+        throw new Exception(error("parseNumber", "An intenger cannot start with a zero")); }
           
       // Floating  point unique
       if (isCurrEq(ch: '.'))
@@ -399,23 +401,38 @@ private:
   }
 }
 
+enum ResultType {
+  Unknown,
+  Label,
+  Data,
+  List
+}
+
 struct ch_Result {
   alias bool16 = short;
-  bool16 isLabel;
+  ResultType type;
   bool16 isValid;
 
   union Value {
     ch_Label label;
     ch_Data data;
+    ch_List list;
   }
   Value value;
 
-  ch_Label getLabel() in (isLabel, "Result is not a label") {
+  /// Get a label
+  ch_Label getLabel() in (type == ResultType.Label, "Result is not a label") {
     return value.label;
   }
 
-  ch_Data getData() in (!isLabel, "Result is a label") {
+  /// Get a single data
+  ch_Data getData() in (type == ResultType.Data, "Result is not a single data") {
     return value.data;
+  }
+
+  /// Get the list
+  ch_List getList() in (type == ResultType.List, "Result is not a list") {
+    return value.list;
   }
 }
 
@@ -429,11 +446,11 @@ struct Parser {
   ch_Result eval() {
 
     // Start parsing
-    if (isEqual(currentToken(), TokenType.Sign)) {
+    if (isTokenEqual(TokenType.Sign)) {
       return parseLabel();
     }
 
-    if ( isEqual(currentToken(), TokenType.SetKeyword) ) {
+    if ( isTokenEqual(TokenType.SetKeyword) ) {
       return parseAssignment();
     }
 
@@ -462,14 +479,19 @@ private:
   // }
 
   /// Compare if a token type is the same as other
-  bool isEqual(Token a, TokenType b) const {
-    return a.type() == b;
+  bool isTokenEqual(TokenType a) const {
+    return a == currentToken.type;
   }
 
   ch_String error(in ch_String name, in ch_String expected) const {
     return format("Parser (%s)[%d:%d]: Unexpected token. Got '%s'. Expected '%s'.", name,
       currentToken().line(), currentToken().row(), currentToken().content(),
         expected);
+  }
+
+  bool isTokenLiteral() const {
+    return currentToken.isString() || currentToken.isNumber()
+      || currentToken.isBoolean();
   }
 
   // ======= //
@@ -479,7 +501,7 @@ private:
   ch_Result parseLabel() {
     ch_Result result;
     ch_Label label;
-    result.isLabel = true;
+    result.type = ResultType.Label;
 
     step(); // Skip sign
     if (!currentToken.isIdentifier()) {
@@ -490,7 +512,7 @@ private:
     label.setId(currentToken().content());
     step(); // Skip identifier
 
-    if (!isEqual(currentToken(), TokenType.Colon)) {
+    if (!isTokenEqual(TokenType.Colon)) {
       throw new Exception(error("parseLabel", ":"));
     }
     step(); // Skip colon
@@ -501,24 +523,53 @@ private:
 
   ch_Result parseAssignment() {
     ch_Result result;
+    ch_List list;
     ch_Data data;
-    result.isLabel = false;
+    auto valueType = CH_VALUE_UNKNOWN;
+    result.type = ResultType.Data; // Single data by default
 
     // Skip assignment ('set' keyword)
     step();
+
+    // =========== //
+    /* List value */
+    // =========== //
+
+    if ( isTokenEqual(TokenType.LeftBrace) ) {
+      // Well, it is a list
+      result.type = ResultType.List;
+      step(); // Consume '{' and other literal values (from goto)
+
+    recursion:
+      if ( !isTokenLiteral() ) {
+        throw new Exception(error("parseAssignment | List", "String / Number / Boolean"));
+      }
+      
+      /// Append content
+      list.append(currentToken.content);
+      step(); // Skip literal
+
+      if ( isTokenEqual(TokenType.Comma) ) {
+        step();
+        goto recursion;
+      } else if ( !isTokenEqual(TokenType.RightBrace) ) {
+        throw new Exception(error("parseAssignment | List", "'}' to close the list"));
+      }
+      
+      step(); // Skip closing '}'
+      goto checkId;
+    }
 
     // ============ //
     /* Single value */
     // ============ //
 
     // Verify if a literal value is passed
-    if ( !currentToken.isString() && !currentToken.isNumber()
-      && !currentToken.isBoolean()) {
+    if ( !isTokenLiteral() ) {
       throw new Exception(error("parseAssignment", "String / Number / Boolean"));
     }
 
     // Get content and value type
-    auto valueType = CH_VALUE_UNKNOWN;
     switch (currentToken.type())
     {
       // String and number
@@ -534,13 +585,13 @@ private:
     }
 
     // Single data type (later: Lists)
-    data.setType(CH_DATA_SINGLE);
     data.setValue(currentToken().content(), valueType);
 
     step(); // Skip literal value
 
+checkId:
     // Verify if a comma is next
-    if (!isEqual(currentToken, TokenType.Comma)) {
+    if (!isTokenEqual(TokenType.Comma)) {
       throw new Exception(error("parseAssignment", ","));
     }
 
@@ -551,10 +602,71 @@ private:
     }
     // Get name
     data.setId(currentToken().content());
+    list.setId(currentToken.content);
     step(); // Skip identifier
 
     result.isValid = true;
-    result.value.data = data;
-    return result;
+    if (result.type == ResultType.Data)
+      result.value.data = data;
+    else if (result.type == ResultType.List)
+      result.value.list = list;
+    
+    return result; 
   }
+}
+
+// Tokenizer and parser
+unittest {
+  import std.stdio : writeln, writefln;
+
+  ch_Data number;
+  number.setId("My_Number");
+  number.setValue("180.6", CH_VALUE_NUMBER);
+
+  writefln("Number data identifier: %s\nNumber data value: %.1f\n",
+    number.id(), number.getRawNumber());
+
+  auto source =
+  "@ User:\n
+    SET       \"nonsense_User\", name\n
+    Set       18, age\n
+  @ Video:\n
+    ; Cherry works lmao\n
+    set       0.6, brightness\n
+    set       Yes, vsync\n
+    set       { 255, 255, 255 }, color";
+
+  // Engine
+  ch_Engine engine;
+  engine = parseCherry(source);
+
+  auto userLabel = engine.getLabel("User");
+  ch_Data username = userLabel.getData("name");
+
+  assert(username.id() == "name");
+  writeln("User::Name: ", username.getString());
+
+  ch_Data age = userLabel.getData("age");
+  
+  assert(age.getString() != "10");
+  writeln("User::Age: ", age.getRawNumber());
+
+  auto videoLabel = engine.getLabel("Video");
+  ch_Data brightness = videoLabel.getData("brightness");
+
+  assert(brightness.getRawNumber() == 0.6);
+  writeln("Video::Brightness: ", brightness.getRawNumber());
+
+  ch_Data vsync = videoLabel.getData("vsync");
+
+  assert(vsync.isTrue());
+  writeln("Video::Vsync: ", vsync.getString());
+
+  ch_List saturation = videoLabel.getList("color");
+  writeln("List length: ", saturation.id());
+  writeln("Saturation R: ", saturation.getNumber(index: 0));
+  writeln("Saturation G: ", saturation.getNumber(index: 1));
+  writeln("Saturation B: ", saturation.getNumber(index: 0));
+
+  engine.clean();
 }

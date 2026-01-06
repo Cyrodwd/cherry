@@ -1,0 +1,151 @@
+El lexer básicamente toma en cuenta tokens.
+Toma en cuenta dónde se registró el token (línea, columna)
+Los tokens de Cherry:
+
+  Invalid           (Any unknown token)
+
+  Identifier        (A-Z / a-z / _)
+  LiteralString     ("anything between two double-quote characters")
+  LiteralNumber     (0-9)
+
+  Label             ('@' <identifier>)
+  Colon             (':')
+  Comma             (',')
+  // Equal             ('=')
+  LeftBrace         ('{')
+  RightBrace        ('}')
+  // LeftBracket    ('[')
+  // RightBracket   (']')
+
+  SetKeyword        ('set')
+  CopyKeyword       ('copy')
+  // GeaKeyword        ('gea')
+
+Las palabras reservadas no pueden ser utilizadas como identificadores.
+Cabe resaltar que se considera una palabra reservada 'set', 'copy' y 'gea'
+sin importar si es mayúscula o minúscula (case-insensitive).
+
+Los números son representados únicamente en representación decimal.
+Un valor entero NO debe empezar con cero.
+No pueden ser hexadecimal, octal o binario.
+No pueden representados tampoco en notación científica.
+
+Los números de punto flotante NO deben empezar ni terminar con un punto. Tampoco puede repetir múltiples puntos en el valor.
+
+Modelos numéricos con errores:
+  .556 // Error: No puede empezar con un punto
+  1156. // Error: No puede terminar con un punto
+  56.123.672 // Error: No puede repetirse múltiples puntos en un valor.
+  0x3 // Error: No se puede usar representación hexadecimal
+  0b011 // Error: No se puede usar representación binaria
+  1e10 // Error: No se puede usar la notación científica
+  0190 // Error: No se puede empezar un número con cero.
+
+Los identificadores pueden contener caracteres alfabeticos, guiones bajos y dígitos. Cabe aclarar, que los identificadores NO pueden empezar con un dígito.
+
+Modelo de identificador:
+  myId20 // Válido: Empieza con un carácter alfabético
+  _otherId // Válido: Empieza con un guión bajo
+  _110 // Válido: Empieza con un guión bajo incluso si los siguientes caracteres son dígitos.
+  9distribution // Error: Empieza con un dígito. Puede provocar errores por cómo el lexer detecta dígitos e identificadores.
+  190 // Error: Un identificador no puede ser únicamente representado por dígitos.
+
+Las etiquetas deben ser marcadas empezando con el símbolo '@' (arroba).
+No debe colocarse el símbolo más de una vez en el identificador de la etiqueta:
+
+Modelo de identificadores de etiquetas:
+
+  @ myLabel // Válido: La etiqueta posee un identificador válido
+  @ _myOtherLabel // Válido: La etiqueta posee un identificador también válido (revise Modelos de identificador)
+  @ 29 // Error: Una etiqueta no puede tener únicamente dígitos como identificador.
+  @ 190Label // Error: Una etiqueta no puede tener un identificador que empiece con un dígito (revise Modelos de identificador)
+
+Los comentarios son bastante minimalistas. Basta con escribir el símbolo ';' (semicolon) para empezar un comentario.
+El comentario termina hasta el final de la línea.
+
+ Modelo de comentario:
+  ; Mi primer comentario - Válido, se usa correctamente
+  ;;;; Muchos símbolos - Válido, todo lo que le siga al símbolo semicolon es un comentario
+  
+  ```
+  ; Mi comentario
+  comentario?
+  ; Error: La parte 'comentario?' está fuera de la línea del primer comentario, por lo que el lexer intentará analizarlo y dará error.
+
+Los strings deben empezar con las comillas dobles ("").
+
+The lexer basically takes tokens into account.
+It takes into account where the token was recorded (line, column).
+Cherry tokens:
+
+  Invalid           (Any unknown token)
+
+  Identifier        (A-Z / a-z / _)
+  LiteralString     (‘anything between two double-quote characters’)
+  LiteralNumber     (0-9)
+
+  Label             (“@” <identifier>)
+  Colon             (“:”)
+  Comma             (“,”)
+  // Equal             (“=”)
+  LeftBrace         (“{”)
+  RightBrace        (“}”)
+  // LeftBracket    (“[”)
+  // RightBracket   (“]”)
+
+  SetKeyword        (“set”)
+  CopyKeyword       (“copy”)
+  // GeaKeyword        (“gea”)
+
+Reserved words cannot be used as identifiers.
+It should be noted that “set”, “copy” and “gea” are considered reserved words
+regardless of whether they are uppercase or lowercase (case-insensitive).
+
+Numbers are represented in decimal form only.
+An integer value must NOT begin with zero.
+They cannot be hexadecimal, octal, or binary.
+They cannot be represented in scientific notation either.
+
+Floating point numbers must NOT begin or end with a decimal point. Multiple decimal points cannot be repeated in the value either.
+
+Examples with errors:
+  .556 // Error: Cannot start with a decimal point
+  1156. // Error: Cannot end with a decimal point
+  56.123.672 // Error: Multiple decimal points cannot be repeated in a value.
+  0x3 // Error: Hexadecimal representation cannot be used
+  0b011 // Error: Binary representation cannot be used
+  1e10 // Error: Scientific notation cannot be used
+  0190 // Error: A number cannot start with zero.
+
+Identifiers can contain alphabetic characters, underscores, and digits. It should be noted that identifiers CANNOT start with a digit.
+
+Identifier examples:
+  myId20 // Valid: Begins with an alphabetic character
+  _otherId // Valid: Begins with an underscore
+  _110 // Valid: Begins with an underscore even if the following characters are digits.
+  9distribution // Error: Begins with a digit. This can cause errors due to how the lexer detects digits and identifiers.
+  190 // Error: An identifier cannot be represented solely by digits.
+
+Labels must be marked by starting with the “@” symbol.
+The symbol must not be placed more than once in the label identifier:
+
+Label identifier examples:
+
+  @ myLabel // Valid: The label has a valid identifier.
+  @ _myOtherLabel // Valid: The label also has a valid identifier (see Identifier Models).
+  @ 29 // Error: A label cannot have only digits as its identifier.
+  @ 190Label // Error: A label cannot have an identifier that starts with a digit (see Identifier Models)
+
+Comments are quite minimalistic. Simply write the symbol “;” (semicolon) to start a comment.
+The comment ends at the end of the line.
+
+ Comment model:
+  ; My first comment - Valid, used correctly
+  ;;;; Many symbols - Valid, everything following the semicolon symbol is a comment
+
+  ```
+  ; My comment
+  comment?
+  ; Error: The part “comment?” is outside the line of the first comment, so the lexer will try to parse it and give an error.
+
+Strings must begin with double quotation marks ("").

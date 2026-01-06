@@ -1,0 +1,25 @@
+- [03 / 01-Jan / 2026 :: v0.0.0]
+
+[ADDED :: 03-January-2026] - Data type aliases and enumerators (ch_DataType)
+[ADDED :: 03-January-2026] -  `ch_Data` and the minimalist prototype `ch_Label`
+
+[CHANGED :: 03-January-2026] - API of Cherry
+[CHANGED :: 03-January-2026] - Most of TXT files have been modified.
+
+[ADDED :: 04-January-2026] - A fuctional lexer.
+
+[FIXED :: 05-January-2026] - Lexer has been fixed.
+[ADDED :: 05-January-2026] - Parser works.
+[CHANGED :: 05-January-2026] - Case Insensitive keywords
+
+- [05 / 01-Jan / 2026 :: v0.0.1]
+
+[ADDED :: 05-January-2026] - Added 'YES' and 'NO' as "booleans"
+[UNSTABLE :: 05-January-2026] - `parseAssignment` recognises lists ({}), barely
+[ADDED :: 05-January-2026] - Lists works lol
+
+[REMOVED :: 05-January-2026] - Removed `ch_DataType` enum
+[IMPROVED :: 05-January-2026] - Better lexer?
+
+[ADDED :: 05-January-2026] - Unittests
+

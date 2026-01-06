@@ -1,7 +1,9 @@
 # cherry
 
 random configuration language written in D
+isn't finished and some features still missing.
 
+<<<<<<< HEAD
 Use ';' to write a single line comment.
 
 ## ch_Data
@@ -27,3 +29,6 @@ In fact, it's not finished yet. It's in an early stage, some features are missin
 
 Managing exceptions can be cumbersome due to the way the API handles them.
 Directly: It's quite experimental.
+=======
+experimental. You can see the txt files.
+>>>>>>> b5d8a52 (Fixed lexer and added lists (not solid))

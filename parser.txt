@@ -1,0 +1,21 @@
+Parser of Cherry language
+
+Syntax of cherry is directly inspired by Assembly.
+
+Data:
+  < identifier > + < value > + < string | number >
+
+Literals:
+  < token-LiteralString > + < token-LiteralNumber >
+
+Assignment:
+  < token-set > + ( < token-LiteralString > | < token-LiteralNumber > )
+    + < token-comma > < token-Identifier >
+
+Copy:
+  < token-copy > + < token-Identifier > + < token-Comma > + < token-Identifier >
+
+Label syntax:
+  < token-sign > + < token-identifier > + < token-colon >
+
+Recursive descent parser

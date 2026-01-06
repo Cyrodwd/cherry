@@ -11,14 +11,6 @@ alias ch_Number =     double;
 
 /// An alias of the `string` data type
 alias ch_String =     immutable(char)[];
-
-/// Types to identify a single data, or a list.
-enum ch_DataType {
-  Unknown = 0,
-  Single, // Single data
-  List, // A list of multiple data
-}
-
 /// Type of the value
 enum ch_ValueType {
   Unknown = 0,
@@ -26,15 +18,6 @@ enum ch_ValueType {
   Number,
   String,
 }
-
-/// An alias to `ch_DataType.Unknown`
-alias CH_DATA_UNKNOWN = ch_DataType.Unknown;
-
-/// An alias to `ch_DataType.Single`
-alias CH_DATA_SINGLE = ch_DataType.Single;
-
-/// An alias to `ch_DataType.List`
-alias CH_DATA_LIST = ch_DataType.List;
 
 /// An alias to `ch_ValueType.Unknown`
 alias CH_VALUE_UNKNOWN = ch_ValueType.Unknown;
@@ -58,30 +41,27 @@ struct ch_Data {
   /// Identifier / Name of the data
   @property auto id() const { return _id; }
 
-  /// Data type
-  @property auto type() const { return _type; }
-
   /// Data value - as a string
-  @property auto getString() const in (_type == CH_DATA_SINGLE, "Data type is a list or unknown")
-  do { return _value.single; }
+  @property auto getString() const
+  do { return _value; }
 
-  @property auto valueType() const in (_type == CH_DATA_SINGLE, "Data type is a list or unknown")
+  @property auto valueType() const
   do { return _vtype; }
 
   /// Converts the digits into a native D numeric value (double).
   /// It only works if the value can be converted as a number
   /// Can throw exceptions if the value can't be converted to a ch_Number type (double)
-  @property auto getRawNumber() const in (_type == CH_DATA_SINGLE, "Data type is a list or unknown")
+  @property auto getRawNumber() const
   in (_vtype == CH_VALUE_NUMBER, "Data value is not a number")
   do {
     import std.conv : to;
-    return _value.single.to!ch_Number;
+    return _value.to!ch_Number;
   }
 
   /// If it is a Boolean, it returns its value (in this case, `YES` = true, `NO` = false).
-  @property bool isTrue() const in (_type == CH_DATA_SINGLE, "Data type is a list or unknown")
+  @property bool isTrue() const
   in (_vtype == CH_VALUE_BOOLEAN, "Data value is not a boolean") {
-    return _value.single.length == 3; // As 'yes' has three characters... lmto.
+    return _value.length == 3; // As 'yes' has three characters... lmto.
   }
 
   // ======= //
@@ -96,69 +76,20 @@ struct ch_Data {
       _id = id;
     }
 
-  /// Set a type to the data
-  @property void setType(in ch_DataType type)
-  in(type != CH_DATA_UNKNOWN && _type != type, "Passed unknown data type")
-  {
-    _type = type;
-  }
-
   /// Set a value to a single-type data
   @property void setValue(in ch_String value, in ch_ValueType type)
-  in (_type == CH_DATA_SINGLE, "Data type is a list or unknown") do {
+  do {
     _vtype = type;
-    _value.single = value;
-  }
-
-  // ======================= //
-  /* List related functions (TODO) */
-  // ======================= //
-
-  /// Append a new data to the list
-  void append(in ch_Data data)
-  in (_type == CH_DATA_LIST, "Data type is not a list") do {
-    if (data.id() in _value.list) return;
-    _value.list[data.id()] = data;
-  }
-
-  /// Create and append a new data to the list
-  void append(in ch_String id, in ch_String value, in ch_ValueType type)
-  in (_type == CH_DATA_LIST, "Data type is not a list") do {
-    ch_Data data;
-
-    data.setId(id);
-    data.setValue(value, type);
-
-    append(data);
-  }
-
-  /// Clear the list elements
-  @property void clean() in(_type == CH_DATA_LIST, "Data type is not a list") do {
-    destroy(_value.list);
-  }
-
-  /// The list length
-  @property auto length() const in(_type == CH_DATA_LIST, "Data type is not a list") do {
-    return _value.list.length;
+    _value = value;
   }
 
 private:
-  /// Data type
-  ch_DataType _type = CH_DATA_UNKNOWN;
-
   /// Value type
   ch_ValueType _vtype = CH_VALUE_UNKNOWN;
 
   /// Identifier / Name of the data
   ch_String _id;
-
-  union ch_Value {
-    ch_String single;
-    ch_Data[string] list;
-  }
-
-  /// Data value (single or list)
-  ch_Value _value;
+  ch_String _value;
 }
 
 struct ch_Label {
@@ -168,12 +99,19 @@ struct ch_Label {
 
   @property auto id() const { return _id; }
 
-  @property ch_Data find(in ch_String key) const {
+  @property ch_Data getData(in ch_String key) const {
     if (key in _elements) {
       return _elements[key];
     }
 
     return ch_Data.init;
+  }
+
+  @property ch_List getList(in ch_String key) {
+    if (key in _lists)
+      return _lists[key];
+    
+    return ch_List.init;
   }
 
   // ======= //
@@ -198,12 +136,17 @@ struct ch_Label {
     _elements[id] = data;
   }
 
+  @property void append(ch_List list) {
+    auto id = list.id();
+    _lists[id] = list;
+  }
+
   @property void clean() {
     _elements = null; // Damn
   }
 
   @property bool isValid() {
-    return _elements.length > 0;
+    return _elements.length > 0 || _lists.length > 0;
   }
 
 private:
@@ -211,6 +154,65 @@ private:
   ch_String _id;
   /// All data stored in the label
   ch_Data[ch_String] _elements;
+  ch_List[ch_String] _lists;
+}
+
+struct ch_List {
+
+  // ======================= //
+  /* List related functions (TODO) */
+  // ======================= //
+
+   /// Identifier / Name of the data
+  @property auto id() const { return _id; }
+
+  @property void setId(in ch_String id)
+  in(id.length > 0, "Passed identifier is empty")
+  in (_id != id, "Identifier has no changes") {
+    _id = id;
+  }
+
+  /// Append a new data to the list
+  void append(ch_String str)
+  do {
+    if (str.length == 0 || str is null) {
+      return;
+    }
+
+    _list ~= str;
+  }
+
+  /// Clear the list elements
+  @property void clean() do {
+    // destroy(_list);
+  }
+
+  /// The list length
+  @property auto length() const do {
+    return _list.length;
+  }
+
+  /***
+    * Converts the value of an element into a number (double), starting the index from zero.
+    * NOTE: Can throw exceptions.
+    */ 
+  @property ch_Number getNumber(in ulong index) const in (length() > 0, "List is empty")  {
+    import std.conv : to;
+
+    if (index >= _list.length) return 0;
+    return _list[index].to!double;
+  }
+
+  /// Get the string value of an element, starting the index from zero.
+  @property ch_String getString(in ulong index) const in (length() > 0, "List is empty") do {
+    if (index >= _list.length) return null;
+    return _list[index];
+  }
+
+private:
+  /// List lmao
+  ch_String        _id;
+  ch_String[]     _list;
 }
 
 struct ch_Engine {
@@ -248,68 +250,38 @@ ch_Engine parseCherry(in ch_String source) {
       break;
     }
 
-    if (result.isLabel) {
+    if (result.type == ResultType.Label) {
       import std.stdio;
       e._labels[result.getLabel().id()] = result.getLabel();
       e._currentLabel = result.getLabel().id();
-    }
-
-    if (!result.isLabel) {
+    } else {
+      // Data and list
       if (e._currentLabel.length == 0 || e._currentLabel is null)
         throw new Exception("No label detected.");
 
-      e._labels[e._currentLabel].append(result.getData());
+      // Data or list :(
+      if (result.type == ResultType.Data)
+        e._labels[e._currentLabel].append(result.getData());
+      else if (result.type == ResultType.List)
+        e._labels[e._currentLabel].append(result.getList());
     }
   } while (true);
 
   return e;
 }
 
-unittest {
-  import std.stdio : writeln, writefln;
+// List and data
+unittest
+{
+  ch_List list;
+  // Crap
+  list.append("Dumbass");
+  list.append("230");
+  list.append("8.5");
+  list.append("YES");
 
-  ch_Data number;
-  number.setId("My_Number");
-  number.setType(CH_DATA_SINGLE);
-  number.setValue("180.6", CH_VALUE_NUMBER);
-
-  writefln("Number data identifier: %s\nNumber data type: %s\nNumber data value: %.1f\n",
-    number.id(), number.type(), number.getRawNumber());
-
-  auto source =
-  "@ User:\n
-    SET       \"nonsense_User\", name\n
-    Set       18, age\n
-  @ Video:\n
-    ; Cherry works lmao\n
-    set       0.6, brightness\n
-    set       Yes, vsync\n";
-
-  // Engine
-  ch_Engine engine;
-  engine = parseCherry(source);
-
-  auto userLabel = engine.getLabel("User");
-  ch_Data username = userLabel.find("name");
-
-  assert(username.id() == "name");
-  writeln("User::Name: ", username.getString());
-
-  ch_Data age = userLabel.find("age");
-  
-  assert(age.getString() != "10");
-  writeln("User::Age: ", age.getRawNumber());
-
-  auto videoLabel = engine.getLabel("Video");
-  ch_Data brightness = videoLabel.find("brightness");
-
-  assert(brightness.getRawNumber() == 0.6);
-  writeln("Video::Brightness: ", brightness.getRawNumber());
-
-  ch_Data vsync = videoLabel.find("vsync");
-
-  assert(vsync.isTrue());
-  writeln("Video::Vsync: ", vsync.getString());
-
-  engine.clean();
+  assert(list.length == 4, "List isn't appending correctly");
+  assert(list.getString(index: 0) == "Dumbass");
+  assert(list.getNumber(index: 1) == 230);
+  list.clean();
 }

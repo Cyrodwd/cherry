@@ -1,0 +1,246 @@
+Cherry: Configuración experimental.
+-----------------------------------------
+@Cyrodwd/@BjankaDev - 2026
+
+: ¿Qué es Cherry?
+Cherry busca ser un lenguaje de configuración experimental, inspirado en archivos de configuración tradicionales.
+
+Su sintaxis es directamente inspirada en la sintaxis tradicional de un Assembler,
+específicamente el estilo de Intel.
+
+Es importante tomar en cuenta que posee instrucciones (keywords), lo cual no puede ser compatible.
+Evita incluir datos con identificadores que choquen con las instrucciones.
+
+: ¿Cuál es su propósito?
+Cherry busca ofrecer un formato de configuración más creativo. Adicionalmente, guardar
+configuraciones de software, sin caer en la complejidad de TOML o JSON.
+
+: ¿Cuáles son sus características?
+Cherry, tiene las características más sencillas posibles para crear configuraciones sencillas.
+Cherry, ofrece <labels> (etiquetas) para organizar datos.
+
+:: Inicio de Q
+------------------------
+
+: ¿Qué son los labels?
+Los labels (etiquetas) son equivalente a un espacio de nombre (namespace) de los datos.
+Esto existe para no confundir datos, crear configuraciones innecesariamente complicadas
+en cuanto a nombramiento, etc.
+
+Normalmente, todo lo que esté debajo de un <label> pertenece a éste mismo.
+
+------------------------
+:: Fin de Q
+
+Adicionalmente, ofrece la capacidad de asignar valores numéricos (enteros y decimales), cadenas
+de caracteres (string), referencias/copias, listas, etc.
+
+--------------------------------------------------------------------
+
+: ¿Qué instrucciones están disponibles en la versión 0.0.0 de Cherry?
+
+Cherry, en su versión más prematura (v0.0.0), contiene pocas instrucciones.
+A continuación, se mostrarán con su nombre, traducción y descripción (propósito).
+
+----------------------
+
+# Instrucciones
+
+## Asignación
+<set> | SET | Asigna un valor nuevo (numérico, cadena, lista, etc.)
+<copy> | COPY | Copia el valor de otro dato hacia el destino
+<gea> | GEnerate Attribute | Asigna un atributo a otro dato (Versión: v0.1.0)
+
+Los atributos se tomarán en cuenta en versiones posteriores.
+
+# Label (sintaxis)
+---------------------------
+Debe incluir un arroba al inicio para especificar que es un label.
+
+'@' < identifier > ':'
+    ; Todo lo que esté declarado aquí, es parte del label.
+
+----------------------
+
+# Sintaxis
+
+<commentary> := ';' <character>*
+
+<set> := < 'set' >   ( <literal> | <list> ) ',' <identifier>
+<ref> := < 'ref' >   <identifier> ',' <identifier>
+<gea> := < 'gea' >    '[' (<identifier> '=' <literal>)+ ']' ',' <identifier>
+
+<character> := A-Z, a-z
+<identifier> := <character> | '_' ... <character>* | '_'* | <digit>*
+<digit> := '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+
+<list> := '{' <literal> [',' <literal>+ ]? '}'
+<literal> := < <number> | <string> >
+<number> := ['-']? <digit>+ ['.' <digit>+]?
+<string> := '"' <character-except-quote>+ '"'
+
+Los valores decimales NO pueden empezar o terminar con un punto ('.').
+
+Modelo (Error):
+    .5
+    1.
+    .05
+
+No existe la notación científica. No se puede usar <digit>'e'<digit>+
+Modelo (Error):
+    1e10
+    1e2
+    1e6
+
+Los strings pueden estar vacíos.
+
+------------------------
+
+# Modelo No. 1
+```
+; Establecer los datos del jugador (nombre, género), datos del video (fov, brillo, depth),
+cambiar colores del crosshair (red, blue, green).
+; Establecer en '2.5' la sensibilidad del ratón.
+; Formar una lista hacia el dato 'color' en el label 'hud' con los tres valores: 0, 0, 128
+
+@ user: ; user.name, user.gender
+    set     "HARD5",            name
+    set     "MALE",             gender
+
+@ video: ; video.fov, video.brightness, video.depth
+
+    set      76.43,              fov
+    copy     fov,                brightness ; Copy its value
+    set      4,                  depth
+
+@ crosshair: ; crosshair.red, crosshair.green, crosshair.blue
+    set     255,                red
+    set     128,                green
+    set     255,                blue
+
+@ mouse: ; mouse.sensitivity
+    set     2.50,               sensitivity
+
+@ hud: ; hud.color
+    set     { 0, 0, 128 },      color ; Lista de tres valores
+```
+
+Cherry: Experimental configuration.
+-----------------------------------------
+@Cyrodwd/@BjankaDev - 2026
+
+: What is Cherry?
+Cherry aims to be an experimental configuration language, inspired by traditional configuration files.
+
+Its syntax is directly inspired by the traditional syntax of an assembler,
+specifically the Intel style.
+
+It is important to note that it has instructions (keywords), which may not be compatible.
+Avoid including data with identifiers that conflict with the instructions.
+
+: What is its purpose?
+Cherry seeks to offer a more creative configuration format. Additionally, it saves
+software configurations without falling into the complexity of TOML or JSON.
+
+: What are its features?
+Cherry has the simplest features possible for creating simple configurations.
+Cherry offers <labels> to organise data.
+
+:: Start of Q
+------------------------
+
+: What are labels?
+Labels are equivalent to a namespace for data.
+This exists so as not to confuse data, create unnecessarily complicated configurations
+in terms of naming, etc.
+
+Normally, everything under a <label> belongs to that label.
+
+------------------------
+:: End of Q
+
+Additionally, it offers the ability to assign numerical values (integers and decimals), character strings
+(strings), references/copies, lists, etc.
+
+--------------------------------------------------------------------
+
+: What instructions are available in version 0.0.0 of Cherry?
+
+Cherry, in its earliest version (v0.0.0), contains few instructions.
+Below, they are shown with their name, translation, and description (purpose).
+
+----------------------
+
+# Instructions
+
+## Assignment
+<set> | SET | Assigns a new value (numeric, string, list, etc.)
+<copy> | COPY | Copies the value of another piece of data to the destination
+<gea> | GEnerate Attribute | Assigns an attribute to another piece of data (Version: v0.1.0)
+
+Attributes will be taken into account in later versions.
+
+# Label (syntax)
+---------------------------
+Must include an at sign at the beginning to specify that it is a label.
+
+“@” < identifier > “:”
+    ; Everything declared here is part of the label.
+
+----------------------
+
+# Syntax
+
+<commentary> := “;” <character>*
+
+<set> := < “set” >   ( <literal> | <list> ) “,” <identifier>
+<ref> := < “ref” >   <identifier> “,” <identifier>
+<gea> := < “gea” >    “[” (<identifier> “=” <literal>)+ “]” ',' <identifier>
+
+<character> := A-Z, a-z
+<identifier> := <character> | “_” ... <character>* | “_”* | <digit>*
+<digit> := “0” | “1” | “2” | “3” | “4” | “5” | “6” | “7” | “8” | “9”
+<list> := “{” <literal> [“,” <literal>+ ]? “}”
+<literal> := < <number> | <string> >
+<number> := [“-”]? <digit>+ [“.” <digit>+]?
+<string> := “‘” <character-except-quote>+ '’'
+
+Decimal values CANNOT start or end with a period (“.”).
+
+Model (Error):
+    .5
+    1.
+    .05
+
+Scientific notation does not exist. <number> 'e' ['-']? <digit> cannot be used.
+
+------------------------
+
+# Model No. 1
+```
+; Set player data (name, gender), video data (fov, brightness, depth),
+change crosshair colours (red, blue, green).
+; Set mouse sensitivity to “2.5”.
+; Create a list for the “colour” data in the “hud” label with the three values: 0, 0, 128
+
+@ user: ; user.name, user.gender
+    set     ‘HARD5’,            name
+    set     ‘MALE’,             gender
+
+@ video: ; video.fov, video.brightness, video.depth
+
+    set      76.43,              fov
+    copy     fov,                brightness ; Copy its value
+    set      4,                  depth
+
+@ crosshair: ; crosshair.red, crosshair.green, crosshair.blue
+    set     255,                red
+    set     128,                green
+    set     255,                blue
+
+@ mouse: ; mouse.sensitivity
+    set     2.50,               sensitivity
+
+@ hud: ; hud.colour
+    set     { 0, 0, 128 },      colour ; List of three values
+```
