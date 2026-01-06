@@ -9,7 +9,9 @@ Data, literally. Can be a string or a number (double).
 
 ### Functions
 `id()` - Identifier or name of the data
+
 `type()` - Type (Single, List)
+
 `getString()` - Only works if the data type is "single". It works with both numbers
 and strings.
 
