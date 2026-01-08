@@ -58,9 +58,21 @@ struct ch_Data {
     return _value.to!ch_Number;
   }
 
+  @property bool isNegative() const
+  in (_vtype == CH_VALUE_NUMBER, "Data value is not a number")
+  do {
+    // Well ... this works cuz '-' only works for numbers, and they cannot be
+    // in other position than at the beginning.... 
+    return _value.length > 0 && _value[0] == '-';
+  }
+
   /// If it is a Boolean, it returns its value (in this case, `YES` = true, `NO` = false).
   @property bool isTrue() const
   in (_vtype == CH_VALUE_BOOLEAN, "Data value is not a boolean") {
+    // Actually, this works! (Only for YES / NO)
+    // I did this cuz since keywords are case-insensitive, it would be
+    // stupid to compare each possible combination of 'YES'
+    // So ... this is more direct.
     return _value.length == 3; // As 'yes' has three characters... lmto.
   }
 
@@ -236,6 +248,17 @@ private:
   ch_String           _currentLabel = null;
 }
 
+/***
+ * Parse a full cherry configuration
+ *
+ * If, at the beginning of an instruction, a token is found that the parser cannot start with, it may
+ * not throw any error. However, be sure to check that the data you are requesting is 
+ * valid, because if it does not find valid tokens to start with, 
+ * it will return an empty (invalid) result.
+ * Params:
+ *   source = Configuration source
+ * Returns: A result (ch_Result). If a token is not valid to begin, then it returns an invalid result
+ */
 ch_Engine parseCherry(in ch_String source) {
   ch_Engine e;
 
@@ -243,7 +266,7 @@ ch_Engine parseCherry(in ch_String source) {
   ch_Result result;
   e._parser.setup(source);
 
-  // Oh my gosh lmao
+  // holyC o_O what i've done
   do {
     result = e._parser.eval();
     if (!result.isValid) {

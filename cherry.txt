@@ -3,7 +3,7 @@ Cherry: Experimental configuration.
 @Cyrodwd/@BjankaDev - 2026
 
 : What is Cherry?
-Cherry aims to be an experimental configuration language, inspired by traditional configuration files.
+Cherry is an experimental configuration language, inspired by traditional configuration files.
 
 Its syntax is directly inspired by the traditional syntax of an assembler,
 specifically the Intel style.

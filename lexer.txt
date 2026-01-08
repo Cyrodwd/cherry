@@ -19,10 +19,10 @@ Los tokens de Cherry:
 
   SetKeyword        ('set')
   CopyKeyword       ('copy')
-  // GeaKeyword        ('gea')
+  // SaKeyword      ('sa')
 
 Las palabras reservadas no pueden ser utilizadas como identificadores.
-Cabe resaltar que se considera una palabra reservada 'set', 'copy' y 'gea'
+Cabe resaltar que se considera una palabra reservada 'set', 'copy' y 'sa'
 sin importar si es mayúscula o minúscula (case-insensitive).
 
 Los números son representados únicamente en representación decimal.

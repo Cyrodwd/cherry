@@ -6,6 +6,7 @@ import std.format;
 
 public:
 
+/// No way that 'Invalid' is being useless
 enum TokenType : short {
   Invalid = -1,         /// Invalid token type
 
@@ -210,6 +211,13 @@ private:
     return prevChar;
   }
 
+  /// Skip 'steps' characters
+  void skip(short steps) {
+    foreach (_ ; 1..steps) {
+      step();
+    }
+  }
+
   auto error(in ch_String name, in ch_String expected) {
     return format("Lexer (%s)[%d:%d] - %s", name, _currentLine, _currentRow,
       expected);
@@ -294,21 +302,41 @@ private:
     Token result;
     TokenType type;
     string content;
+    bool isNegative = false;
     bool hasPoint = false; // For floating-points
 
     updateStartingPosition();
 
-    // Integers-only for now
-    while ( ( isDigit ( _currentChar ) || isCurrEq('.') ) && !isCurrEq(ch: 0) ) {
-      // Do not start with zero if  there are more digits before it
-      if (_startPosition == _currentPosition && (isCurrEq(ch: '0') && isDigit(peek()) )) {
-        throw new Exception(error("parseNumber", "An intenger cannot start with a zero")); }
-          
-      // Floating  point unique
+    // Integer (positive and negative) and decimal numbers
+    while ( ( isDigit ( _currentChar ) || isCurrEq('.') || isCurrEq('-') ) && !isCurrEq(ch: 0) ) {
+      // Negative sign o_O
+      if (_startPosition == _currentPosition && isCurrEq(ch: '-') ) {
+        isNegative = true;
+        step(); // Skip that bullshit
+
+        continue;
+      }
+
+      // PLS IMPROVE ME: Oh my fuckin' god :( ...
+      if ((isNegative && (_currentPosition == (_startPosition + 1)))
+          || _startPosition == _currentPosition)
+        
+        if ( isCurrEq(ch: '0') && isDigit(peek()) ) {
+        throw new Exception("A number cannot start with zero");
+      }
+
+      // This basically says that the number is a double (decimal), however
+      // it doesn't allow more than ONE dot symbol. Cuz that doesn't even make sense.
+      // Basically to avoid problems when converting it to a native D type by the API.
       if (isCurrEq(ch: '.'))
       {
         if (hasPoint) { throw new Exception(error("parseNumber", "Invalid floating-point format")); }
         else hasPoint = true; // Accept it
+      }
+
+      // No minus sign after using it :(
+      if ( isCurrEq(ch: '-') ) {
+        throw new Exception(error("parseNumber", "Unexpected '-'"));
       }
 
       step();
@@ -327,25 +355,82 @@ private:
     return result;
   }
 
+  /// Yes.
+  int getEscapeCharacter() {
+    switch ( _currentChar ) {
+      case '\\':
+        return '\\';
+      case '\'':
+        return '\'';
+      case '\"':
+        return '\"';
+      case 'n':
+        return '\n';
+      case 't':
+        return '\t';
+      case 'v':
+        return '\v';
+      default:
+        return -1;
+    }
+
+    // Unreachable
+    assert(0, "getEscapeCharacter: UNREACHABLE");
+  }
+
+  /// Escape sequences, yey!!!!
   Token parseString() {
-    Token result;
+    Token result = Token.invalid(0,0,0);
     TokenType type = TokenType.LiteralString;
-    string content;
+    string content = null;
 
     step(); // Skip opening '"'
     updateStartingPosition();
 
-    while ( !isCurrEq(ch: '"') ) {
-      step();
+    while ( !isCurrEq(ch: '"') && !isCurrEq(ch: '\0') ) {
+      // Escape character
+      if ( isCurrEq(ch: '\\') ) {
+        step(); // Skip backslash
+
+        int c = getEscapeCharacter();
+        if (c < 0) throw new Exception(error("parseString", "A valid escape character"));
+        content ~= c; step(); // Append that character dude
+        continue;
+      }
+
+      content ~= _currentChar;
+      step(); // Next character
     }
 
     if (!isCurrEq(ch: '"') ) {
-      throw new Exception(error("parseString", "Expected: '\"' to close the string"));
+      throw new Exception(error("parseString", "'\"' to end string"));
+    }
+    step(); // Skip last double-quote
+
+    result = Token.create(type, _startLine, _startRow, content);
+    return result;
+  }
+
+  /// No escape sequences bro
+  Token parseRawString() {
+    Token result = Token.invalid(0,0,0);
+    TokenType type = TokenType.LiteralString;
+    string content = null;
+
+    step(); // Skip opening single-quote (')
+    updateStartingPosition();
+
+    while ( !isCurrEq(ch: '\'') && !isCurrEq(ch: 0) ) {
+      step(); // Using length based on position
     }
 
     content = _sourceContent[_startPosition .. _currentPosition];
-    step(); // Skip last double-quote
+    // Closing character
+    if ( !isCurrEq( '\'' ) ) {
+      throw new Exception(error("parseRawString", "Closing single-quote: <'>"));
+    }
 
+    step(); // Skip closing single-quote (')
     result = Token.create(type, _startLine, _startRow, content);
     return result;
   }
@@ -353,7 +438,7 @@ private:
   /// Generates a new token
   Token parse() {
 
-    // While character is valid
+    // While character is valid ('\0' is zero)
     while ( !isCurrEq(ch: 0) ) {
       // White spaces
       if ( isWhite(_currentChar) ) {
@@ -373,12 +458,18 @@ private:
       }
 
       // Digits
-      if ( isDigit( _currentChar ) ) {
+      if ( isDigit( _currentChar ) || isCurrEq('-') ) {
        return parseNumber();
       }
 
+      // String (with escape sequences)
       if ( isCurrEq(ch: '"') ) {
         return parseString();
+      }
+
+      // String (without escape sequences)
+      if ( isCurrEq(ch: '\'') ) {
+        return parseRawString();
       }
 
       // Single characters
@@ -401,6 +492,7 @@ private:
   }
 }
 
+/// Label data or list ... damn bro
 enum ResultType {
   Unknown,
   Label,
@@ -515,7 +607,9 @@ private:
     if (!isTokenEqual(TokenType.Colon)) {
       throw new Exception(error("parseLabel", ":"));
     }
+
     step(); // Skip colon
+
     result.isValid = true;
     result.value.label = label;
     return result;
@@ -540,24 +634,34 @@ private:
       result.type = ResultType.List;
       step(); // Consume '{' and other literal values (from goto)
 
-    recursion:
+      // Expect a literal token
       if ( !isTokenLiteral() ) {
         throw new Exception(error("parseAssignment | List", "String / Number / Boolean"));
       }
-      
+  
+  appendElement:
       /// Append content
       list.append(currentToken.content);
       step(); // Skip literal
 
       if ( isTokenEqual(TokenType.Comma) ) {
+        // If it is only a comma, then ignore it
         step();
-        goto recursion;
-      } else if ( !isTokenEqual(TokenType.RightBrace) ) {
-        throw new Exception(error("parseAssignment | List", "'}' to close the list"));
+
+        // Only if the next token is a literal
+        // Yes, i use 'goto'. I deserve your worst insults u_u
+        if ( isTokenLiteral() ) {
+          goto appendElement;
+        }
+      }
+
+      // Expect to close the list with '{'
+      if ( !isTokenEqual(TokenType.RightBrace) ) {
+        throw new Exception(error("parseAssignment | List", "\"}\" to close the list"));
       }
       
       step(); // Skip closing '}'
-      goto checkId;
+      goto checkId; // Parse identifier
     }
 
     // ============ //
@@ -628,13 +732,16 @@ unittest {
 
   auto source =
   "@ User:\n
-    SET       \"nonsense_User\", name\n
+    SET       \"random_\\\"USER\\\"\", name\n
+    Set       \"New\\nLine! And \\tTabs!\", description
     Set       18, age\n
   @ Video:\n
     ; Cherry works lmao\n
     set       0.6, brightness\n
     set       Yes, vsync\n
-    set       { 255, 255, 255 }, color";
+    set       { 255, 255, 255, }, color\n
+    set       -1, errorcode\n
+    set     -5, error";
 
   // Engine
   ch_Engine engine;
@@ -646,15 +753,19 @@ unittest {
   assert(username.id() == "name");
   writeln("User::Name: ", username.getString());
 
+  ch_Data description = userLabel.getData("description");
+  assert(description.getString() != "NewnLine! And tTabs!");
+  writefln("User::Description: <%s>", description.getString());
+
   ch_Data age = userLabel.getData("age");
-  
-  assert(age.getString() != "10");
+  assert(age.getString() == "18", "Integer numbers aren't working");
   writeln("User::Age: ", age.getRawNumber());
+
 
   auto videoLabel = engine.getLabel("Video");
   ch_Data brightness = videoLabel.getData("brightness");
 
-  assert(brightness.getRawNumber() == 0.6);
+  assert(brightness.getRawNumber() == 0.6, "Brightness hasn't a float value");
   writeln("Video::Brightness: ", brightness.getRawNumber());
 
   ch_Data vsync = videoLabel.getData("vsync");
@@ -663,10 +774,16 @@ unittest {
   writeln("Video::Vsync: ", vsync.getString());
 
   ch_List saturation = videoLabel.getList("color");
+  assert(saturation.length() > 0, "Saturation list is not working");
+
   writeln("List length: ", saturation.id());
   writeln("Saturation R: ", saturation.getNumber(index: 0));
   writeln("Saturation G: ", saturation.getNumber(index: 1));
   writeln("Saturation B: ", saturation.getNumber(index: 0));
+
+  ch_Data errorcode = videoLabel.getData("errorcode");
+  assert(errorcode.getRawNumber() == -1, "Errorcode is NOT -1. Negative numbers aren't working");
+  writeln("Error code (Video): ", errorcode.getRawNumber());
 
   engine.clean();
 }
