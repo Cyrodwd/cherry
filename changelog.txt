@@ -42,10 +42,10 @@ names.
 
 [QUESTION :: 08-January-2026] - Should Cherry add multi-line comments?
 
-[QUESTION :: 08-January-2026] - Should I add a Semantic Analyzer to separe
-Parser from symbol creation? The advantage of the actual method is basically if
+[QUESTION :: 08-January-2026] - Should I add a Semantic Analyzer to separate
+Parser from symbol creation? The advantage of the actual method is basically that if
 there's an error in middle of the configuration, the previous variables aren't affected and
-they work.
+they still being evaluated and working correctly.
 
 [WAITING :: 08-January-2026] - Added 'sa' and attributes support.
 
