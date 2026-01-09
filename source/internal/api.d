@@ -334,7 +334,7 @@ private:
  * it will return an empty (invalid) result.
  * Params:
  *   source = Configuration source
- * Returns: A result (ch_Result). If a token is not valid to begin, then it returns an invalid result
+ * Returns: An engine with labels
  */
 chEngine parseCherry(in string source) {
   chEngine e;
@@ -384,13 +384,13 @@ unittest
 {
   chList list;
   // Crap
-  list.append("Dumbass");
+  list.append("String");
   list.append("230");
   list.append("8.5");
   list.append("YES");
 
   assert(list.length == 4, "List isn't appending correctly");
-  assert(list.toString(index: 0) == "Dumbass");
+  assert(list.toString(index: 0) == "String");
   assert(list.toInt(index: 1) == 230);
   list.clean();
 }
