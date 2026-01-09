@@ -1,4 +1,8 @@
 module internal.api;
+
+import std.conv : to, ConvException;
+import std.stdio : writefln;
+
 import internal.parser;
 
 /** 
@@ -6,13 +10,8 @@ import internal.parser;
  * Cyrodwd - Bjankadev
  */
 
-/// An alias of the `long` data type
-alias ch_Number =     double;
-
-/// An alias of the `string` data type
-alias ch_String =     immutable(char)[];
 /// Type of the value
-enum ch_ValueType {
+enum chValueType {
   Unknown = 0,
   Boolean,
   Number,
@@ -20,20 +19,20 @@ enum ch_ValueType {
 }
 
 /// An alias to `ch_ValueType.Unknown`
-alias CH_VALUE_UNKNOWN = ch_ValueType.Unknown;
+alias CH_VALUE_UNKNOWN = chValueType.Unknown;
 /// An alias to `ch_ValueType.Boolean`
-alias CH_VALUE_BOOLEAN = ch_ValueType.Boolean;
+alias CH_VALUE_BOOLEAN = chValueType.Boolean;
 
 /// An alias to `ch_ValueType.Integer`
-alias CH_VALUE_NUMBER = ch_ValueType.Number;
+alias CH_VALUE_NUMBER = chValueType.Number;
 
 /// An alias to `ch_ValueType.String`
-alias CH_VALUE_STRING = ch_ValueType.String;
+alias CH_VALUE_STRING = chValueType.String;
 
 /* Structs */
 
 /// Struct of a data
-struct ch_Data {
+struct chData {
   // ======= //
   /* Getters */
   // ======= //
@@ -41,30 +40,29 @@ struct ch_Data {
   /// Identifier / Name of the data
   @property auto id() const { return _id; }
 
-  /// Data value - as a string
-  @property auto getString() const
-  do { return _value; }
-
   @property auto valueType() const
   do { return _vtype; }
 
-  /// Converts the digits into a native D numeric value (double).
-  /// It only works if the value can be converted as a number
-  /// Can throw exceptions if the value can't be converted to a ch_Number type (double)
-  @property auto getRawNumber() const
-  in (_vtype == CH_VALUE_NUMBER, "Data value is not a number")
-  do {
-    import std.conv : to;
-    return _value.to!ch_Number;
-  }
+  /// Data value - as a string
+  @property auto toString() const @safe
+  do { return _value; }
 
-  @property bool isNegative() const
-  in (_vtype == CH_VALUE_NUMBER, "Data value is not a number")
-  do {
-    // Well ... this works cuz '-' only works for numbers, and they cannot be
-    // in other position than at the beginning.... 
-    return _value.length > 0 && _value[0] == '-';
-  }
+  // Signed values
+  mixin convertInto!(byte, "toByte");
+  mixin convertInto!(short, "toShort");
+  mixin convertInto!(int, "toInt");
+  mixin convertInto!(long, "toLong");
+
+  // Unsigned values
+  mixin convertInto!(ubyte, "toUnsignedByte");
+  mixin convertInto!(ushort, "toUnsignedShort");
+  mixin convertInto!(uint, "toUnsigned");
+  mixin convertInto!(ulong, "toUnsignedLong");
+
+  // Floating-point values
+  mixin convertInto!(float, "toFloat");
+  mixin convertInto!(double, "toDouble");
+  mixin convertInto!(real, "toReal");
 
   /// If it is a Boolean, it returns its value (in this case, `YES` = true, `NO` = false).
   @property bool isTrue() const
@@ -76,12 +74,21 @@ struct ch_Data {
     return _value.length == 3; // As 'yes' has three characters... lmto.
   }
 
+  /// Is it a negative number?
+  @property bool isNegative() const
+  in (_vtype == CH_VALUE_NUMBER, "Data value is not a number")
+  do {
+    // Well ... this works cuz '-' only works for numbers, and they cannot be
+    // in other position than at the beginning.... 
+    return _value.length > 0 && _value[0] == '-';
+  }
+
   // ======= //
   /* Setters */
   // ======= //
 
   /// Set an identifier for the data
-  @property void setId(in ch_String id)
+  @property void setId(in string id)
     in (id.length > 0, "Passed identifier is empty") // First assert
     in (_id != id, "You're passing the same identifier") // Second assert
     do {
@@ -89,7 +96,7 @@ struct ch_Data {
     }
 
   /// Set a value to a single-type data
-  @property void setValue(in ch_String value, in ch_ValueType type)
+  @property void setValue(in string value, in chValueType type)
   do {
     _vtype = type;
     _value = value;
@@ -97,79 +104,117 @@ struct ch_Data {
 
 private:
   /// Value type
-  ch_ValueType _vtype = CH_VALUE_UNKNOWN;
+  chValueType _vtype = CH_VALUE_UNKNOWN;
 
   /// Identifier / Name of the data
-  ch_String _id;
-  ch_String _value;
+  string _id;
+  string _value;
+
+  mixin template convertInto(T, string id) if (!is(T : string)) {
+    mixin ("@property ", T, " ", id, "() const in (_vtype == CH_VALUE_NUMBER, \"Data value is not a number\")
+    do {
+      ", T, " result = ", T, ".init;
+
+      try
+        result = _value.to!",T,";
+      catch (ConvException ce)
+        writefln(\"Cannot convert data into ", T, ": %s\", ce.msg);
+      
+      return result;
+    }");
+  }
 }
 
-struct ch_Label {
+struct chLabel {
   // ======= //
   /* Getters */
   // ======= //
 
   @property auto id() const { return _id; }
 
-  @property ch_Data getData(in ch_String key) const {
+  @property chData getData(in string key) const {
     if (key in _elements) {
       return _elements[key];
     }
 
-    return ch_Data.init;
+    return chData.init;
   }
 
-  @property ch_List getList(in ch_String key) {
+  @property chList getList(in string key) {
     if (key in _lists)
       return _lists[key];
     
-    return ch_List.init;
+    return chList.init;
   }
 
   // ======= //
   /* Setters */
   // ======= //
 
-  @property void setId(in ch_String id)
+  @property void setId(in string id)
   in(id.length > 0, "Passed identifier is empty")
   in (_id != id, "Identifier has no changes") {
     _id = id;
   }
 
-  @property void append(in ch_Data data) {
+  /// Append data
+  @property void append(in chData data) {
     auto id = data.id();
     
     if (id in _elements) {
       import std.format : format;
-      ch_String error = format("Cannot override '%s'", data.id());
+
+      string error = format("Cannot override '%s'", data.id());
       throw new Exception(error);
     }
 
     _elements[id] = data;
   }
 
-  @property void append(ch_List list) {
+  /// Append a list
+  @property void append(chList list) {
     auto id = list.id();
     _lists[id] = list;
   }
 
+  /// Basically checks if the listarray has elements.
+  /// If `elements` is zero or less, then it checks if the label has lists in general.
+  /// If `elements` is specified, it will check if this labels has EXACTLY that count}
+  /// By default, `elements` is set as zero (general check).
+  @property size_t hasLists(int elements = 0) const {
+    if (elements <= 0) return _lists.length > 0;
+    return _lists.length == elements;
+  }
+
+  /// Basically checks if the data array has elements.
+  /// If `elements` is zero or less, then it checks if the label has lists in general.
+  /// If `elements` is specified, it will check if this labels has EXACTLY that count
+  /// By default, `elements` is set as zero (general check).
+  @property size_t hasData(int elements = 0) const {
+    if (elements <= 0) return _elements.length > 0;
+
+    return _elements.length == elements;
+  }
+
+  /// Clean elements
   @property void clean() {
     _elements = null; // Damn
   }
 
+  /// Has elements or lists?
   @property bool isValid() {
-    return _elements.length > 0 || _lists.length > 0;
+    return hasData() || hasLists();
   }
 
 private:
   /// Identifier / Name of the label
-  ch_String _id;
+  string _id;
   /// All data stored in the label
-  ch_Data[ch_String] _elements;
-  ch_List[ch_String] _lists;
+  chData[string] _elements;
+  chList[string] _lists;
 }
 
-struct ch_List {
+struct chList {
 
   // ======================= //
   /* List related functions (TODO) */
@@ -178,14 +223,14 @@ struct ch_List {
    /// Identifier / Name of the data
   @property auto id() const { return _id; }
 
-  @property void setId(in ch_String id)
+  @property void setId(in string id)
   in(id.length > 0, "Passed identifier is empty")
   in (_id != id, "Identifier has no changes") {
     _id = id;
   }
 
   /// Append a new data to the list
-  void append(ch_String str)
+  void append(string str)
   do {
     if (str.length == 0 || str is null) {
       return;
@@ -204,36 +249,68 @@ struct ch_List {
     return _list.length;
   }
 
-  /***
-    * Converts the value of an element into a number (double), starting the index from zero.
-    * NOTE: Can throw exceptions.
-    */ 
-  @property ch_Number getNumber(in ulong index) const in (length() > 0, "List is empty")  {
-    import std.conv : to;
+  // Signed values
+  mixin convertInto!(byte, "toByte");
+  mixin convertInto!(short, "toShort");
+  mixin convertInto!(int, "toInt");
+  mixin convertInto!(long, "toLong");
 
-    if (index >= _list.length) return 0;
-    return _list[index].to!double;
-  }
+  // Unsigned values
+  mixin convertInto!(ubyte, "toUnsignedByte");
+  mixin convertInto!(ushort, "toUnsignedShort");
+  mixin convertInto!(uint, "toUnsigned");
+  mixin convertInto!(ulong, "toUnsignedLong");
+
+  // Floating-point values
+  mixin convertInto!(float, "toFloat");
+  mixin convertInto!(double, "toDouble");
+  mixin convertInto!(real, "toReal");
 
   /// Get the string value of an element, starting the index from zero.
-  @property ch_String getString(in ulong index) const in (length() > 0, "List is empty") do {
-    if (index >= _list.length) return null;
+  @property string toString(in ulong index) const in (length() > 0, "List is empty") do {
+    if (index >= _list.length) {
+      indexErrorMsg(index);
+      return null;
+    }
+
     return _list[index];
   }
 
 private:
   /// List lmao
-  ch_String        _id;
-  ch_String[]     _list;
+  string        _id;
+  string[]     _list;
+
+  void indexErrorMsg(in ulong i) const {
+    writefln("Index '%u' exceeds the length of the list", i);
+  }
+
+  mixin template convertInto(T, string id) {
+    mixin("@property ", T, " ", id, "(in ulong index) const in (length() > 0, \"List is empty\") {
+      if (index >= _list.length) {
+        indexErrorMsg(index);
+        return ", T, ".init;
+      }
+      ", T, " result = ", T, ".init;
+      try
+        result = _list[index].to!", T, ";
+      catch (ConvException ce)
+        writefln(\"Cannot convert into ", T, ": %s\", ce.msg);
+      
+      return result;
+    }");
+  }
 }
 
-struct ch_Engine {
+struct chEngine {
   
-  ch_Label getLabel(in ch_String key) {
-    if (key !in _labels) return ch_Label.init;
+  /// Gets a label
+  chLabel getLabel(in string key) {
+    if (key !in _labels) return chLabel.init;
     return _labels[key];
   }
 
+  /// Clean???
   void clean() {
     foreach (ref label ; _labels) {
       label.clean();
@@ -244,8 +321,8 @@ struct ch_Engine {
 
 private:
   Parser              _parser;
-  ch_Label[ch_String] _labels;
-  ch_String           _currentLabel = null;
+  chLabel[string] _labels;
+  string           _currentLabel = null;
 }
 
 /***
@@ -259,28 +336,37 @@ private:
  *   source = Configuration source
  * Returns: A result (ch_Result). If a token is not valid to begin, then it returns an invalid result
  */
-ch_Engine parseCherry(in ch_String source) {
-  ch_Engine e;
+chEngine parseCherry(in string source) {
+  chEngine e;
 
   // Setup parser
-  ch_Result result;
+  chResult result;
   e._parser.setup(source);
 
   // holyC o_O what i've done
   do {
     result = e._parser.eval();
+
+    // EOF
+    if (result.type == ResultType.Eof) break;
+
+    // An invalid result
     if (!result.isValid) {
+      writefln("Warning: got an invalid result from [%d:%d]", e._parser.line(), e._parser.row());
       break;
     }
 
     if (result.type == ResultType.Label) {
-      import std.stdio;
       e._labels[result.getLabel().id()] = result.getLabel();
       e._currentLabel = result.getLabel().id();
     } else {
       // Data and list
       if (e._currentLabel.length == 0 || e._currentLabel is null)
-        throw new Exception("No label detected.");
+      {
+        writefln("Engine error: No label detected for '%s'.",
+          result.type == ResultType.Data ? result.getData().id() : result.getList.id());
+        continue;
+      }
 
       // Data or list :(
       if (result.type == ResultType.Data)
@@ -296,7 +382,7 @@ ch_Engine parseCherry(in ch_String source) {
 // List and data
 unittest
 {
-  ch_List list;
+  chList list;
   // Crap
   list.append("Dumbass");
   list.append("230");
@@ -304,7 +390,7 @@ unittest
   list.append("YES");
 
   assert(list.length == 4, "List isn't appending correctly");
-  assert(list.getString(index: 0) == "Dumbass");
-  assert(list.getNumber(index: 1) == 230);
+  assert(list.toString(index: 0) == "Dumbass");
+  assert(list.toInt(index: 1) == 230);
   list.clean();
 }

@@ -2,6 +2,7 @@ module internal.parser;
 
 import cherry;
 import std.ascii : isWhite, isAlpha, isAlphaNum, isDigit, toLower;
+import std.stdio : writeln;
 import std.format;
 
 public:
@@ -34,7 +35,7 @@ enum TokenType : short {
 
 struct Token {
   /// Creates a new token
-  static auto create(in TokenType type, in size_t line, in size_t row, in ch_String content) {
+  static auto create(in TokenType type, in size_t line, in size_t row, in string content) {
     Token token;
 
     token._type = type;
@@ -78,7 +79,7 @@ struct Token {
    *
    * Executes an assert verifying that the content is not empty
    */
-  @property ch_String content() const in(hasContent(), "Token content is not valid") {
+  @property string content() const in(hasContent(), "Token content is not valid") {
     return _content;
   }
 
@@ -107,7 +108,7 @@ private:
   /// Column where the token was registered
   size_t          _regRow;
   /// Content of the token itself
-  ch_String       _content;
+  string       _content;
 }
 
 struct Lexer {
@@ -134,7 +135,7 @@ struct Lexer {
 
 private:
   /// Configuration file content
-  ch_String       _sourceContent;
+  string       _sourceContent;
   /// Current line being read
   size_t          _currentLine;
   /// Current column / row being read
@@ -151,7 +152,7 @@ private:
   char            _currentChar;
   /// Current token evaluated
   Token           _currentToken = Token.invalid(0,0,0);
-  // Next token evaluated
+  // Next token evaluated (NOT USED)
   // Token           _nextToken = Token.invalid(0,0,0);
 
   /// Symbol for comments
@@ -218,9 +219,10 @@ private:
     }
   }
 
-  auto error(in ch_String name, in ch_String expected) {
-    return format("Lexer (%s)[%d:%d] - %s", name, _currentLine, _currentRow,
-      expected);
+  /// Shows an error
+  void error(in string name, in string expected) {
+    format("Lexer (%s)[%d:%d] - %s", name, _currentLine, _currentRow,
+      expected).writeln;
   }
 
   /// Peek a character in X depth
@@ -247,12 +249,13 @@ private:
     _startRow = _currentRow;
   }
 
-  TokenType getIdType(in ch_String str) {
+  TokenType getIdType(in string str) {
     import std.conv : to;
     import std.algorithm.iteration : map;
 
     // Convert it to lowercase (case-insensitive)
-    ch_String convId = str.map!(a => toLower(a)).to!string;
+    string convId = str.map!(a => toLower(a)).to!string;
+
     if (convId !in keywords)
       return TokenType.Identifier;
 
@@ -277,6 +280,10 @@ private:
     while ( isWhite(_currentChar) && !isCurrEq(ch: 0) ) {
       step();
     }
+  }
+
+  Token invalidToken() {
+    return Token.invalid(_currentChar, _currentLine, _currentRow);
   }
 
   /// Parse an identifier or a keyword
@@ -322,21 +329,26 @@ private:
           || _startPosition == _currentPosition)
         
         if ( isCurrEq(ch: '0') && isDigit(peek()) ) {
-        throw new Exception("A number cannot start with zero");
-      }
+          error("parseNumber", "A number cannot contain a zero at the beginning if there are more digits.");
+          return invalidToken();
+        }
 
       // This basically says that the number is a double (decimal), however
       // it doesn't allow more than ONE dot symbol. Cuz that doesn't even make sense.
       // Basically to avoid problems when converting it to a native D type by the API.
       if (isCurrEq(ch: '.'))
       {
-        if (hasPoint) { throw new Exception(error("parseNumber", "Invalid floating-point format")); }
-        else hasPoint = true; // Accept it
+        if (hasPoint) {
+          error("parseNumber", "A number cannot contain more than one floating-point");
+          return invalidToken();
+        }
+        else { hasPoint = true; } // Accept it
       }
 
       // No minus sign after using it :(
       if ( isCurrEq(ch: '-') ) {
-        throw new Exception(error("parseNumber", "Unexpected '-'"));
+        error("parseNumber", "Unexpected '-'. '-' should be only at the beginning");
+        return invalidToken();
       }
 
       step();
@@ -345,8 +357,10 @@ private:
     content = _sourceContent[_startPosition .. _currentPosition];
     // Verify if the number ends with '.' (which is not valid)
     auto len = (_currentPosition - _startPosition) - 1;
+
     if (content[ len ] == '.' ) {
-      throw new Exception(error("parseNumber", "A number cannot have a dot at the end"));
+      error("parseNumber", "A number cannot have a dot at the end");
+      return invalidToken();
     }
 
     type = TokenType.LiteralNumber;
@@ -393,7 +407,13 @@ private:
         step(); // Skip backslash
 
         int c = getEscapeCharacter();
-        if (c < 0) throw new Exception(error("parseString", "A valid escape character"));
+
+        // Unknown escape sequence
+        if (c < 0) { 
+          error("parseString", "A valid escape character");
+          return invalidToken();
+        }
+
         content ~= c; step(); // Append that character dude
         continue;
       }
@@ -402,9 +422,12 @@ private:
       step(); // Next character
     }
 
+    // Close '"'
     if (!isCurrEq(ch: '"') ) {
-      throw new Exception(error("parseString", "'\"' to end string"));
+      error("parseString", "'\"' to end string");
+      return invalidToken();
     }
+
     step(); // Skip last double-quote
 
     result = Token.create(type, _startLine, _startRow, content);
@@ -424,13 +447,17 @@ private:
       step(); // Using length based on position
     }
 
+    // Slice content :D
     content = _sourceContent[_startPosition .. _currentPosition];
+
     // Closing character
     if ( !isCurrEq( '\'' ) ) {
-      throw new Exception(error("parseRawString", "Closing single-quote: <'>"));
+      error("parseRawString", "Closing single-quote: \"'\"");
+      return invalidToken();
     }
 
     step(); // Skip closing single-quote (')
+
     result = Token.create(type, _startLine, _startRow, content);
     return result;
   }
@@ -495,60 +522,134 @@ private:
 /// Label data or list ... damn bro
 enum ResultType {
   Unknown,
+  Eof,
   Label,
   Data,
-  List
+  List,
 }
 
-struct ch_Result {
+struct chResult {
   alias bool16 = short;
   ResultType type;
   bool16 isValid;
 
   union Value {
-    ch_Label label;
-    ch_Data data;
-    ch_List list;
+    short error;
+    chLabel label;
+    chData data;
+    chList list;
   }
   Value value;
 
   /// Get a label
-  ch_Label getLabel() in (type == ResultType.Label, "Result is not a label") {
+  chLabel getLabel() in (type == ResultType.Label, "Result is not a label") {
     return value.label;
   }
 
   /// Get a single data
-  ch_Data getData() in (type == ResultType.Data, "Result is not a single data") {
+  chData getData() in (type == ResultType.Data, "Result is not a single data") {
     return value.data;
   }
 
   /// Get the list
-  ch_List getList() in (type == ResultType.List, "Result is not a list") {
+  chList getList() in (type == ResultType.List, "Result is not a list") {
     return value.list;
+  }
+
+  static auto eof() {
+    chResult r;
+
+    r.type = ResultType.Eof;
+    r.value.error = 0;
+    r.isValid = true;
+
+    return r;
+  }
+
+  /// Creating a label
+  static auto create( chLabel label ) {
+    chResult r;
+
+    r.type = ResultType.Label;
+    r.value.label = label;
+    r.isValid = true;
+
+    return r;
+  }
+
+  /// Creating data
+  static auto create( chData data ) {
+    chResult r;
+    
+    r.type = ResultType.Data;
+    r.value.data = data;
+    r.isValid = true;
+
+    return r;
+  }
+
+  /// Creating a list
+  static auto create ( chList list ) {
+    chResult r;
+
+    r.type = ResultType.List;
+    r.value.list = list;
+    r.isValid = true;
+
+    return r;
+  }
+
+  /// Invalid value
+  static auto invalid() {
+    chResult r;
+
+    r.type = ResultType.Unknown;
+    r.value.error = -1;
+    r.isValid = false;
+
+    return r;
   }
 }
 
 struct Parser {
 
+  /// Setup lexer
   void setup(string source) {
     _lexer.setup(source);
     _lexer.eval();
   }
   
-  ch_Result eval() {
+  chResult eval() {
 
-    // Start parsing
+    // Directly.
+    if (isTokenEqual(TokenType.Eof)) {
+      return chResult.eof();
+    }
+
+    // Well, this is for labels
     if (isTokenEqual(TokenType.Sign)) {
       return parseLabel();
     }
 
+    /* Keywords */
     if ( isTokenEqual(TokenType.SetKeyword) ) {
       return parseAssignment();
     }
 
-    ch_Result result;
-    result.isValid = false;
-    return result;
+    // Ehem... unexpected tokens at the beginning
+    error("eval", " @ or keywords ");
+    return chResult.invalid();
+  }
+
+package:
+  /// Line (debug)
+  @property size_t line() const {
+    return currentToken.line();
+  }
+
+  /// Row (Debug)
+  @property size_t row() const {
+    return currentToken.row();
   }
 
 private:
@@ -575,10 +676,14 @@ private:
     return a == currentToken.type;
   }
 
-  ch_String error(in ch_String name, in ch_String expected) const {
-    return format("Parser (%s)[%d:%d]: Unexpected token. Got '%s'. Expected '%s'.", name,
+  chResult invalidResult() {
+    return chResult.invalid();
+  }
+
+  void error(in string name, in string expected) const {
+    format("Parser (%s)[%d:%d]: Unexpected token. Got '%s'. Expected '%s'.", name,
       currentToken().line(), currentToken().row(), currentToken().content(),
-        expected);
+        expected).writeln;
   }
 
   bool isTokenLiteral() const {
@@ -590,14 +695,13 @@ private:
   /* Parsing */
   // ======= //
 
-  ch_Result parseLabel() {
-    ch_Result result;
-    ch_Label label;
-    result.type = ResultType.Label;
+  chResult parseLabel() {
+    chLabel label; // Label :U
 
     step(); // Skip sign
     if (!currentToken.isIdentifier()) {
-      throw new Exception(error("parseLabel", "An identifier"));
+      error("parseLabel", "An identifier");
+      return invalidResult();
     }
 
     // Set id lol
@@ -605,22 +709,67 @@ private:
     step(); // Skip identifier
 
     if (!isTokenEqual(TokenType.Colon)) {
-      throw new Exception(error("parseLabel", ":"));
+      error("parseLabel", ":");
+      return invalidResult();
     }
 
     step(); // Skip colon
-
-    result.isValid = true;
-    result.value.label = label;
-    return result;
+    return chResult.create( label );
   }
 
-  ch_Result parseAssignment() {
-    ch_Result result;
-    ch_List list;
-    ch_Data data;
-    auto valueType = CH_VALUE_UNKNOWN;
-    result.type = ResultType.Data; // Single data by default
+  chResult parseList() {
+    chList list;
+    step(); // Consume '{'
+
+    // Expect a literal value
+    if ( !isTokenLiteral() ) {
+      error("parseAssignment | List", "String / Number / Boolean");
+      return invalidResult();
+    }
+
+appendElement:
+    list.append ( currentToken().content );
+    step(); // Skip literal
+
+    if ( isTokenEqual (TokenType.Comma) ) {
+      step(); // Trailing comma
+
+      if ( isTokenLiteral() ) {
+        goto appendElement;
+      }
+    }
+
+    // Close '}'
+    if ( !isTokenEqual (TokenType.RightBrace) ) {
+      error("parseList", "Right brace to close list (})");
+      return invalidResult();
+    }
+
+    step(); // Skip closing brace '}'
+
+    /* Parse identifier */
+
+    if ( !isTokenEqual (TokenType.Comma) ) {
+      error("parseList", "A comma (,)");
+      return invalidResult();
+    }
+
+    step(); // Skip comma
+
+    if ( !isTokenEqual (TokenType.Identifier) ) {
+      error("parseList", "An identifier");
+      return invalidResult();
+    }
+
+    list.setId ( currentToken.content );
+    step(); // Skip identifier
+
+    return chResult.create( list );
+  }
+
+  chResult parseAssignment() {
+    chValueType valueType;
+    chData data;
 
     // Skip assignment ('set' keyword)
     step();
@@ -628,40 +777,8 @@ private:
     // =========== //
     /* List value */
     // =========== //
-
-    if ( isTokenEqual(TokenType.LeftBrace) ) {
-      // Well, it is a list
-      result.type = ResultType.List;
-      step(); // Consume '{' and other literal values (from goto)
-
-      // Expect a literal token
-      if ( !isTokenLiteral() ) {
-        throw new Exception(error("parseAssignment | List", "String / Number / Boolean"));
-      }
-  
-  appendElement:
-      /// Append content
-      list.append(currentToken.content);
-      step(); // Skip literal
-
-      if ( isTokenEqual(TokenType.Comma) ) {
-        // If it is only a comma, then ignore it
-        step();
-
-        // Only if the next token is a literal
-        // Yes, i use 'goto'. I deserve your worst insults u_u
-        if ( isTokenLiteral() ) {
-          goto appendElement;
-        }
-      }
-
-      // Expect to close the list with '{'
-      if ( !isTokenEqual(TokenType.RightBrace) ) {
-        throw new Exception(error("parseAssignment | List", "\"}\" to close the list"));
-      }
-      
-      step(); // Skip closing '}'
-      goto checkId; // Parse identifier
+    if ( isTokenEqual(TokenType.LeftBrace) /* Left brace: '{'*/ ) {
+      return parseList();
     }
 
     // ============ //
@@ -670,7 +787,8 @@ private:
 
     // Verify if a literal value is passed
     if ( !isTokenLiteral() ) {
-      throw new Exception(error("parseAssignment", "String / Number / Boolean"));
+      error("parseAssignment", "String / Number / Boolean");
+      return invalidResult();
     }
 
     // Get content and value type
@@ -689,33 +807,27 @@ private:
     }
 
     // Single data type (later: Lists)
-    data.setValue(currentToken().content(), valueType);
-
+    data.setValue( currentToken.content() , valueType);
     step(); // Skip literal value
 
-checkId:
     // Verify if a comma is next
     if (!isTokenEqual(TokenType.Comma)) {
-      throw new Exception(error("parseAssignment", ","));
+      error("parseAssignment", "A comma (,)");
+      return invalidResult();
     }
 
     step(); // Skip comma
 
-    if (!currentToken.isIdentifier()) {
-      throw new Exception(error("parseAssignment", "An identifier"));
+    if (!currentToken.isIdentifier() ) {
+      error("parseAssignment", "An identifier");
+      return invalidResult();
     }
+
     // Get name
-    data.setId(currentToken().content());
-    list.setId(currentToken.content);
+    data.setId( currentToken.content );
     step(); // Skip identifier
 
-    result.isValid = true;
-    if (result.type == ResultType.Data)
-      result.value.data = data;
-    else if (result.type == ResultType.List)
-      result.value.list = list;
-    
-    return result; 
+    return chResult.create( data );
   }
 }
 
@@ -723,67 +835,66 @@ checkId:
 unittest {
   import std.stdio : writeln, writefln;
 
-  ch_Data number;
+  chData number;
   number.setId("My_Number");
   number.setValue("180.6", CH_VALUE_NUMBER);
 
   writefln("Number data identifier: %s\nNumber data value: %.1f\n",
-    number.id(), number.getRawNumber());
+    number.id(), number.toDouble());
 
   auto source =
   "@ User:\n
-    SET       \"random_\\\"USER\\\"\", name\n
+    SET       \"random_\\\"USER\\\"\", name ; Escape sequences\n
     Set       \"New\\nLine! And \\tTabs!\", description
     Set       18, age\n
   @ Video:\n
     ; Cherry works lmao\n
     set       0.6, brightness\n
     set       Yes, vsync\n
-    set       { 255, 255, 255, }, color\n
+    set       { 255, 255, 255, }, color ; Trailing comma\n
     set       -1, errorcode\n
-    set     -5, error";
+    ";
 
   // Engine
-  ch_Engine engine;
+  chEngine engine;
   engine = parseCherry(source);
 
   auto userLabel = engine.getLabel("User");
-  ch_Data username = userLabel.getData("name");
+  chData username = userLabel.getData("name");
 
   assert(username.id() == "name");
-  writeln("User::Name: ", username.getString());
+  writeln("User::Name: ", username.toString());
 
-  ch_Data description = userLabel.getData("description");
-  assert(description.getString() != "NewnLine! And tTabs!");
-  writefln("User::Description: <%s>", description.getString());
+  chData description = userLabel.getData("description");
+  assert(description.toString() != "NewnLine! And tTabs!");
+  writefln("User::Description: <%s>", description.toString());
 
-  ch_Data age = userLabel.getData("age");
-  assert(age.getString() == "18", "Integer numbers aren't working");
-  writeln("User::Age: ", age.getRawNumber());
-
+  chData age = userLabel.getData("age");
+  assert(age.toString() == "18", "Integer numbers aren't working");
+  writeln("User::Age: ", age.toInt());
 
   auto videoLabel = engine.getLabel("Video");
-  ch_Data brightness = videoLabel.getData("brightness");
+  chData brightness = videoLabel.getData("brightness");
 
-  assert(brightness.getRawNumber() == 0.6, "Brightness hasn't a float value");
-  writeln("Video::Brightness: ", brightness.getRawNumber());
+  assert(brightness.toDouble() == 0.6, "Brightness hasn't a float value");
+  writeln("Video::Brightness: ", brightness.toDouble());
 
-  ch_Data vsync = videoLabel.getData("vsync");
+  chData vsync = videoLabel.getData("vsync");
 
-  assert(vsync.isTrue());
-  writeln("Video::Vsync: ", vsync.getString());
+  assert(vsync.isTrue(), "Vsync is not true?");
+  writeln("Video::Vsync: ", vsync.toString());
 
-  ch_List saturation = videoLabel.getList("color");
-  assert(saturation.length() > 0, "Saturation list is not working");
+  chList saturation = videoLabel.getList("color");
+  assert(saturation.length() == 3, "Saturation list is not working");
 
   writeln("List length: ", saturation.id());
-  writeln("Saturation R: ", saturation.getNumber(index: 0));
-  writeln("Saturation G: ", saturation.getNumber(index: 1));
-  writeln("Saturation B: ", saturation.getNumber(index: 0));
+  writeln("Saturation R: ", saturation.toInt(index: 0));
+  writeln("Saturation G: ", saturation.toInt(index: 1));
+  writeln("Saturation B: ", saturation.toInt(index: 0));
 
-  ch_Data errorcode = videoLabel.getData("errorcode");
-  assert(errorcode.getRawNumber() == -1, "Errorcode is NOT -1. Negative numbers aren't working");
-  writeln("Error code (Video): ", errorcode.getRawNumber());
+  chData errorcode = videoLabel.getData("errorcode");
+  assert(errorcode.toInt() == -1, "Errorcode is NOT -1. Negative numbers aren't working");
+  writeln("Error code (Video): ", errorcode.toDouble());
 
   engine.clean();
 }

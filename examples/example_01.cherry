@@ -2,7 +2,7 @@
 
 @ Video:
   set   "opengl", driver
-  set   "1920x1080", resolution  
+  set   { 1920, 1080 }, resolution
   set   yes, vsync
 
 @ User:

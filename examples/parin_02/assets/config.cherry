@@ -1,0 +1,13 @@
+; A configuration language. Very simple.
+; Keywords are case-insensitive
+
+@ Video:
+  Set       { 640, 480, } , resolution
+  SET 	    60,fps
+  set 	    NO,fullscreen
+
+@ Textures:
+  sEt       "0.5", scale ; clamp
+  seT       "180.0", rotation
+  ; Cherry now supports escape sequences!
+  sET      'Hello from Cherry!', randomMessage

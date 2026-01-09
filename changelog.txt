@@ -23,23 +23,34 @@
 
 [ADDED :: 05-January-2026] - Unittests
 
-[CHANGED :: 07-January-2026] - Cherry now allows trailing commas in lists
-[ADDED :: 07-January-2026] - Added escape-sequence support for strings
-[ADDED :: 07-January-2026] - Added negative numbers.
+- [07 / 01-Jan / 2026 :: v0.0.2]
 
-- [08 / 01-Jan / 2026 :: v0.0.2]
+[CHANGED :: 07-January-2026] - Cherry now allows trailing commas in lists
+
+[ADDED :: 07-January-2026] - Added escape-sequence support for stringsl
+
+[ADDED :: 07-January-2026] - Added negative numbers.
 
 [REMOVED :: 08-January-2026] - Removed exceptions.
 
-[CHANGED :: 08-January-2026] - Cherry API may change considerably.
+[REMOVED :: 08-January-2026] - Removed data aliases
 
-[WAITING :: 08-January-2026] - Cherry now supports multi-line comments (also nested).
+[REMOVED :: 08-January-2026] - Removed '_' after the 'ch' prefix in struct / union
+names.
 
-[IMPROVED :: 08-January-2026] - Parser now creates nodes that another analyzer
-converts into symbols.
+[CHANGED :: 08-January-2026] - Cherry API changed its functions names.
+
+[QUESTION :: 08-January-2026] - Should Cherry add multi-line comments?
+
+[QUESTION :: 08-January-2026] - Should I add a Semantic Analyzer to separe
+Parser from symbol creation? The advantage of the actual method is basically if
+there's an error in middle of the configuration, the previous variables aren't affected and
+they work.
 
 [WAITING :: 08-January-2026] - Added 'sa' and attributes support.
 
-[WAITING :: 08-January-2026] - Added related-labels (as namespaces).
+[QUESTION :: 08-January-2026] - Is it really necessary to add "chained-labels"? Like:
+  @ Video::Quality | @ Video::Gamma.
 
-[QUESTION :: 08-January-2026] - Should Cherry use '%' at the beginning of identifiers?
+[QUESTION :: 08-January-2026] - Should Cherry use '%' at the beginning of identifiers to avoid
+errors with keywords?
